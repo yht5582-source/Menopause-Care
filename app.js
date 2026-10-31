@@ -81,5 +81,12 @@ osteoForm.addEventListener('submit',e=>{
   o.innerHTML=`<div class="output-icon ${n?'':'red'}">${n?'✓':'—'}</div><span class="kicker">NHI 5.6 · <span class="badge tw">台灣規範</span></span><h3>${n?`符合 ${n} 類藥物的給付條件`:'目前不符合骨鬆藥物給付條件'}</h3><div class="osteo-list">${r.res.map(x=>`<div><strong class="${x.ok?'yes':'no'}">${x.ok?'✓ 符合':'✗ 不符合'} · ${esc(x.drug)}</strong><p>${esc(x.why)}</p></div>`).join('')}</div><div class="output-note">${r.notes.map(esc).join('<br>')}</div>`;
 });
 
+/* ---------- 目前區段標示 ---------- */
+const navLinks=[...document.querySelectorAll('.topbar nav a')];
+if('IntersectionObserver' in window){
+  const spy=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)navLinks.forEach(a=>a.classList.toggle('current',a.hash==='#'+e.target.id));}),{rootMargin:'-45% 0px -50% 0px'});
+  navLinks.forEach(a=>{const t=document.querySelector(a.hash);if(t)spy.observe(t);});
+}
+
 $('#source-list').innerHTML=sources.map((s,i)=>`<a class="source-item" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer"><span>${String(i+1).padStart(2,'0')}</span><span><strong>${esc(s.name)}</strong><small>${esc(s.note)}</small></span><span aria-hidden="true">↗</span></a>`).join('');
 })();
