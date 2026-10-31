@@ -7,6 +7,8 @@ const sources=[
   {name:'The Menopause Society · 2022 Hormone Therapy',url:'https://doi.org/10.1097/GME.0000000000002028',note:'荷爾蒙治療時機、效益與風險'},
   {name:'The Menopause Society · 2023 Nonhormone Therapy',url:'https://menopause.org/professional-resources/position-statements',note:'熱潮紅非荷爾蒙治療'},
   {name:'ESHRE/ASRM/CRE/IMS · POI Guideline 2024',url:'https://www.asrm.org/practice-guidance/practice-committee-documents/evidence-based-guideline-premature-ovarian-insufficiency--2024/',note:'40 歲以下卵巢功能不全：月經失調 ≥4 個月 + FSH >25 IU/L'},
+  {name:'健保署 · 藥品給付規定（第一節、第五節）',url:'https://www.nhi.gov.tw/ch/cp-7593-ad2a9-3397-1.html',note:'台灣規範：5.3 雌／黃體素、5.6 骨鬆藥物、1.1.6 gabapentin、1.2.1 SSRI/SNRI'},
+  {name:'健保署 · 健保用藥品項網路查詢',url:'https://info.nhi.gov.tw/INAE3000/INAE3000S01',note:'台灣規範：給付中品項（查詢 2026-10-31）'},
   {name:'FDA · Fezolinetant liver warning（2024）',url:'https://www.fda.gov/drugs/drug-safety-communications/fda-adds-warning-about-rare-occurrence-serious-liver-injury-use-veozah-fezolinetant-hot-flashes-due',note:'盒裝警語：基線、前 3 個月每月、第 6、9 個月肝功能'}
 ];
 
@@ -24,7 +26,7 @@ function assess(v){
   const notes=[];
   if(Number.isFinite(num(v.since))&&Number.isFinite(months)&&months>=12&&Math.abs(num(v.since)-months/12)>2)
     notes.push('「距停經年數」與「距最後一次月經月數」相差超過 2 年，請確認；晚啟動判斷採填寫的年數。');
-  if(errors.length)return {errors,stage:'輸入待修正',stageNote:errors.join(' '),alerts:[],actions:[],notes,late:false,since,sinceDerived,poi:false,postmeno:false};
+  if(errors.length)return {errors,stage:'輸入待修正',stageNote:errors.join(' '),alerts:[],actions:[],notes,late:false,since,sinceDerived,poi:false,postmeno:false,taiwan:[]};
 
   const poi=age<40&&(months>=4||(v.cycleChange&&v.vms));
   const postmeno=months>=12&&!v.hormonal;
@@ -71,7 +73,52 @@ function assess(v){
   if(poi)actions.push({title:'POI · 獨立照護路徑',body:'確診後討論骨骼（DXA）、心血管、心理健康與生育；無禁忌時，荷爾蒙治療通常持續至一般停經年齡附近。'});
   if(!v.vms&&!v.gsm)actions.push({title:'症狀 · 目前無主要困擾',body:'不因年齡或檢驗數值本身啟動 HRT；說明可能出現的症狀與可尋求協助的時機。'});
   actions.push({title:'長期健康與追蹤',body:'依年齡與個人風險評估骨質疏鬆、心血管風險、乳房與子宮頸篩檢；開始 HRT 後約 3 個月複評，其後至少每年檢視。'});
-  return {errors,stage,stageNote,alerts,actions,notes,late,since,sinceDerived,poi,postmeno};
+  return {errors,stage,stageNote,alerts,actions,notes,late,since,sinceDerived,poi,postmeno,taiwan:taiwan(v)};
+}
+
+/* ---------- 台灣健保（藥品給付規定；健保用藥品項查詢 2026-10-31） ---------- */
+const NHI_DATE='健保藥品給付規定（第一節、第五節，最新版分章節）與健保用藥品項查詢，查核 2026-10-31';
+const nhiDrugs=[
+  {group:'全身雌激素',listed:true,items:'estradiol valerate／estradiol 口服錠、結合型雌激素（conjugated estrogens）、estradiol 凝膠（如 Oestrogel、Divigel）與貼片',rule:'口服品項無專屬給付規定。5.3.1 Estradiol 經皮吸收製劑：5.3.1.1 Estraderm TTS、Oestro V.T 限不能口服者，申報時具體說明不能口服理由；5.3.1.2 Climara 50 限每週一片。凝膠未列於 5.3.1 子項。'},
+  {group:'雌黃體素複方',listed:true,items:'estradiol + norethisterone、estradiol valerate + medroxyprogesterone 等',rule:'無專屬給付規定。'},
+  {group:'黃體素（內膜保護）',listed:true,items:'微粒化 progesterone 軟膠囊（如 Utrogestan）、medroxyprogesterone 錠',rule:'無專屬給付規定。Levonorgestrel IUS（Mirena）5.3.5 僅限連續 ≥3 個月經血過多致 Hb ≤10 g/dL，5 年內不得再用，不含 HRT 內膜保護。'},
+  {group:'陰道雌激素',listed:true,items:'estriol 0.5 mg 陰道錠／栓劑（如 Ovestin、Esvatin）',rule:'無專屬給付規定；給付品項中未見 estradiol 陰道錠。'},
+  {group:'SSRI／SNRI',listed:true,items:'paroxetine、venlafaxine 等',rule:'1.2.1：病歷應詳細註明診斷依據及使用理由；給付規定未列熱潮紅適應症，依仿單核准適應症申報。'},
+  {group:'Gabapentin',listed:true,items:'gabapentin',rule:'1.1.6 限帶狀疱疹後神經痛（他藥無效）；1.3.2.2 限局部癲癇輔助治療。用於熱潮紅不在給付範圍。'},
+  {group:'NK3 拮抗劑',listed:false,items:'fezolinetant、elinzanetant',rule:'健保用藥品項查無給付中品項（2026-10-31）。'},
+  {group:'其他',listed:false,items:'tibolone、ospemifene、prasterone',rule:'健保用藥品項查無給付中品項（2026-10-31）。'}
+];
+
+function taiwan(v){
+  const out=[];
+  if(v.vms){
+    out.push('全身 HRT：口服 estradiol／結合型雌激素與微粒化 progesterone 均有健保品項，無專屬給付限制。');
+    if(v.vteRisk||v.vteCvd)out.push('經皮雌激素：貼片（Estraderm TTS、Oestro V.T）依 5.3.1.1 限不能口服者，申報需具體說明理由；Climara 50 每週一片（5.3.1.2）。');
+    out.push('Fezolinetant／elinzanetant 未在健保給付品項中（2026-10-31），需自費。');
+    out.push('SSRI／SNRI 有給付品項（1.2.1 需病歷註明診斷依據與理由），但給付規定未列熱潮紅適應症；gabapentin 用於熱潮紅不在給付範圍（1.1.6、1.3.2.2）。');
+  }
+  if(v.gsm)out.push('陰道雌激素：健保品項為 estriol 0.5 mg 陰道錠／栓劑；ospemifene、prasterone 未在給付品項中。');
+  if(v.uterus&&v.vms)out.push('Mirena 僅於經血過多致 Hb ≤10 g/dL 時給付（5.3.5），不含 HRT 內膜保護用途。');
+  out.push('骨鬆藥物需符合 5.6 條件（DXA T-score 與骨折）；單純停經或 POI 不構成給付條件，可用下方「健保骨鬆給付檢核」。');
+  return out;
+}
+
+/* o: tScore, hipSpine(脊椎/髖部骨折數), wristHumerus(遠端橈骨/近端肱骨骨折數), ra, insulinDM, steroid, recentNew(24 個月內新診斷骨折), arFail(抗骨吸收劑無法耐受或持續使用中仍新骨折), arFail12(持續使用 ≥12 個月仍新骨折或無法耐受) */
+function nhiOsteo(o){
+  const t=num(o.tScore),hs=num(o.hipSpine)||0,wh=num(o.wristHumerus)||0;
+  if(!Number.isFinite(t))return {error:'請輸入 DXA T-score。'};
+  const osteoporosis=t<=-2.5,osteopenia=t>-2.5&&t<-1.0;
+  const res=[];
+  const allAR=(osteoporosis&&hs>=1)||(osteopenia&&hs>=2);
+  const denoAlen=allAR||(osteoporosis&&wh>=1)||(osteopenia&&wh>=2);
+  const riskPath=osteoporosis&&!!(o.ra||o.insulinDM||o.steroid);
+  res.push({drug:'雙磷酸鹽（alendronate、zoledronate、risedronate、ibandronate）、SERM（raloxifene、bazedoxifene）',ok:allAR,why:allAR?'5.6.1 2(1)Ⅰ：T ≤ -2.5 合併脊椎或髖部骨折，或骨質疏少（-2.5 < T < -1.0）合併脊椎／髖部 ≥2 處或 2 次骨折。':'需 T ≤ -2.5 合併脊椎／髖部骨折，或骨質疏少合併脊椎／髖部 ≥2 處（次）骨折。'});
+  res.push({drug:'Denosumab（Prolia）、alendronate（部分品項除外）',ok:denoAlen||riskPath,why:allAR?'5.6.1 2(1)Ⅰ：同上（脊椎或髖部骨折條件）。':denoAlen?'5.6.1 2(1)Ⅰ：遠端橈骨或近端肱骨骨折之擴充條件（限 denosumab、alendronate）。':riskPath?'5.6.1 2(1)Ⅱ：T ≤ -2.5 且合併類風濕性關節炎、使用胰島素之糖尿病或類固醇 >5 mg/天超過 3 個月（病歷載明）。':'另可因遠端橈骨／近端肱骨骨折，或 T ≤ -2.5 合併 RA、胰島素治療糖尿病、類固醇 >5 mg/天 >3 個月而給付。'});
+  const tpd=t<=-3.0&&hs>=2&&!!o.arFail12;
+  res.push({drug:'Teriparatide',ok:tpd,why:'5.6.2：停經後婦女，T ≤ -3.0，脊椎或髖部 ≥2 處骨折，且無法耐受抗骨吸收劑或持續使用 ≥12 個月仍有 ≥1 處新骨折；最多 18 支、2 年內用完。'});
+  const romo=t<=-3.0&&!!o.recentNew&&((hs+wh)>=2||!!o.arFail);
+  res.push({drug:'Romosozumab',ok:romo,why:'5.6.3：停經後婦女，T ≤ -3.0；24 個月內 ≥2 處骨折含 1 處新診斷，或無法耐受／持續使用抗骨吸收劑仍有新診斷骨折；最多 24 支、1 年內用完。與 teriparatide 擇一。'});
+  return {res,notes:['一次限用一項骨鬆藥物，不得併用（5.6.1 2(2)）。','使用雙磷酸鹽前須檢測血清 creatinine（5.6.1 2(3)）。','骨折部位與 T-score 判讀以原文為準；teriparatide／romosozumab 之骨折條件此處簡化計算。']};
 }
 
 const cases=[
@@ -106,6 +153,6 @@ const questions=[
   {level:'進階',q:'40 歲以下 POI 確診後，若無禁忌，荷爾蒙治療通常討論到何時？',a:['一般停經年齡附近','只治療一週','等到 80 歲才開始'],correct:0,why:'POI 的長期低雌激素影響骨骼與心血管健康，與自然停經 HRT 的時機不同。'}
 ];
 /*ENGINE-END*/
-const MENO={assess,cases,questions,sources};
+const MENO={assess,taiwan,nhiOsteo,nhiDrugs,NHI_DATE,cases,questions,sources};
 if(typeof module!=='undefined'&&module.exports)module.exports=MENO;else root.MENO=MENO;
 })(typeof window!=='undefined'?window:globalThis);

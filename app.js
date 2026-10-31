@@ -1,5 +1,5 @@
 (function(){
-const {assess,cases,questions,sources}=window.MENO;
+const {assess,nhiOsteo,nhiDrugs,NHI_DATE,cases,questions,sources}=window.MENO;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const letter=i=>String.fromCharCode(65+i);
@@ -15,10 +15,11 @@ form.addEventListener('submit',e=>{
   v.age=f.age.value;v.months=f.months.value;v.since=f.since.value;
   const r=assess(v),warn=r.errors.length||r.alerts.length;
   const sinceLine=Number.isFinite(r.since)?`<p class="since-line">距停經約 ${r.since} 年${r.sinceDerived?'（由無月經月數換算）':''}</p>`:'';
-  out.innerHTML=`<div class="output-icon ${warn?'red':''}">${warn?'!':'✓'}</div><span class="kicker">CARE PATHWAY</span><h3>${esc(r.stage)}</h3><p>${esc(r.stageNote)}</p>${sinceLine}`+
+  out.innerHTML=`<div class="output-icon ${warn?'red':''}">${warn?'!':'✓'}</div><span class="kicker">CARE PATHWAY · <span class="badge intl">國際規範</span></span><h3>${esc(r.stage)}</h3><p>${esc(r.stageNote)}</p>${sinceLine}`+
     (r.notes.length?`<ul class="note-list">${r.notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul>`:'')+
     (r.alerts.length?`<div class="alert-list"><strong>先留意的警訊與風險</strong><ul>${r.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul></div>`:'')+
     (r.actions.length?`<div class="criteria">${r.actions.map((a,i)=>`<div><strong>${String(i+1).padStart(2,'0')} · ${esc(a.title)}</strong><p>${esc(a.body)}</p></div>`).join('')}</div>`:'')+
+    (r.taiwan.length?`<div class="tw-block"><strong><span class="badge tw">台灣規範</span>健保給付提示</strong><ul>${r.taiwan.map(t=>`<li>${esc(t)}</li>`).join('')}</ul><small>${esc(NHI_DATE)}</small></div>`:'')+
     `<div class="output-note">這是教學分流，不構成診斷或處方。症狀有其他可能原因；若有異常出血先評估。HRT 須檢視禁忌、避孕需求、個人風險與當地藥物規範。</div>`;
   if(window.matchMedia('(max-width:900px)').matches)out.scrollIntoView({behavior:'smooth',block:'start'});
 });
@@ -66,6 +67,19 @@ function renderQuiz(){
 }
 document.querySelectorAll('[data-level]').forEach(b=>b.addEventListener('click',()=>setQuizLevel(b.dataset.level)));
 setQuizLevel(level);
+
+/* ---------- 台灣健保 ---------- */
+$('#nhi-drugs').innerHTML=nhiDrugs.map(d=>`<div class="nhi-row"><h3>${esc(d.group)}<span class="status ${d.listed?'yes':'no'}">${d.listed?'有給付品項':'未列給付'}</span></h3><p class="items">${esc(d.items)}</p><p>${esc(d.rule)}</p></div>`).join('');
+$('#nhi-date').textContent=NHI_DATE+'。';
+const osteoForm=$('#osteo-form');
+osteoForm.addEventListener('submit',e=>{
+  e.preventDefault();const f=osteoForm.elements;
+  const r=nhiOsteo({tScore:f.tScore.value,hipSpine:f.hipSpine.value,wristHumerus:f.wristHumerus.value,ra:f.ra.checked,insulinDM:f.insulinDM.checked,steroid:f.steroid.checked,recentNew:f.recentNew.checked,arFail:f.arFail.checked,arFail12:f.arFail12.checked});
+  const o=$('#osteo-output');
+  if(r.error){o.innerHTML=`<div class="output-icon red">!</div><span class="kicker">NHI 5.6</span><h3>${esc(r.error)}</h3>`;return;}
+  const n=r.res.filter(x=>x.ok).length;
+  o.innerHTML=`<div class="output-icon ${n?'':'red'}">${n?'✓':'—'}</div><span class="kicker">NHI 5.6 · <span class="badge tw">台灣規範</span></span><h3>${n?`符合 ${n} 類藥物的給付條件`:'目前不符合骨鬆藥物給付條件'}</h3><div class="osteo-list">${r.res.map(x=>`<div><strong class="${x.ok?'yes':'no'}">${x.ok?'✓ 符合':'✗ 不符合'} · ${esc(x.drug)}</strong><p>${esc(x.why)}</p></div>`).join('')}</div><div class="output-note">${r.notes.map(esc).join('<br>')}</div>`;
+});
 
 $('#source-list').innerHTML=sources.map((s,i)=>`<a class="source-item" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer"><span>${String(i+1).padStart(2,'0')}</span><span><strong>${esc(s.name)}</strong><small>${esc(s.note)}</small></span><span aria-hidden="true">↗</span></a>`).join('');
 })();

@@ -1,6 +1,6 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {assess,cases,questions,sources}=require('../clinical.js');
+const {assess,taiwan,nhiOsteo,nhiDrugs,cases,questions,sources}=require('../clinical.js');
 
 const base={age:52,months:18,since:1.5,vms:true,gsm:false,cycleChange:false,hormonal:false,uterus:true,bleeding:false,breastCancer:false,vteCvd:false,vteRisk:false,liver:false};
 
@@ -81,5 +81,41 @@ test('教學資料完整且題目答案在有效範圍',()=>{
   assert.ok(questions.every(q=>q.correct>=0&&q.correct<q.a.length&&q.a.length>=3));
   assert.ok(cases.every(c=>c.answer>=0&&c.answer<c.options.length));
   assert.equal(new Set(cases.map(c=>c.id)).size,cases.length);
-  assert.ok(sources.length>=5&&sources.every(s=>/^https:\/\//.test(s.url)));
+  assert.ok(sources.length>=7&&sources.every(s=>/^https:\/\//.test(s.url)));
+});
+
+test('台灣規範：熱潮紅提示 fezolinetant 未給付、gabapentin 不給付熱潮紅',()=>{
+  const r=assess(base);
+  assert.ok(r.taiwan.some(x=>/Fezolinetant.*未在健保/.test(x)));
+  assert.ok(r.taiwan.some(x=>/gabapentin/.test(x)));
+  assert.ok(!r.taiwan.some(x=>/5\.3\.1\.1/.test(x)));
+  assert.ok(assess({...base,vteRisk:true}).taiwan.some(x=>/5\.3\.1\.1/.test(x)));
+  assert.ok(assess({...base,vms:false,gsm:true}).taiwan.some(x=>/estriol/.test(x)));
+  assert.deepEqual(assess({...base,age:''}).taiwan,[]);
+});
+test('NHI 品項表：NK3 拮抗劑未列給付，雌激素有品項',()=>{
+  assert.equal(nhiDrugs.find(d=>d.group==='NK3 拮抗劑').listed,false);
+  assert.equal(nhiDrugs.find(d=>d.group==='全身雌激素').listed,true);
+});
+test('5.6.1 抗骨吸收劑：骨鬆 + 脊椎/髖部骨折；骨質疏少需 ≥2 處',()=>{
+  const ok=r=>r.res.map(x=>x.ok);
+  assert.deepEqual(ok(nhiOsteo({tScore:-2.7,hipSpine:1})),[true,true,false,false]);
+  assert.deepEqual(ok(nhiOsteo({tScore:-1.8,hipSpine:1})).slice(0,2),[false,false]);
+  assert.deepEqual(ok(nhiOsteo({tScore:-1.8,hipSpine:2})).slice(0,2),[true,true]);
+  assert.deepEqual(ok(nhiOsteo({tScore:-2.5,hipSpine:0})).slice(0,2),[false,false]);
+  assert.equal(nhiOsteo({tScore:-1.0,hipSpine:3}).res[0].ok,false);
+});
+test('5.6.1 denosumab/alendronate 擴充：橈骨/肱骨骨折或 RA、胰島素、類固醇',()=>{
+  assert.deepEqual(nhiOsteo({tScore:-2.6,wristHumerus:1}).res.slice(0,2).map(x=>x.ok),[false,true]);
+  for(const k of ['ra','insulinDM','steroid'])assert.equal(nhiOsteo({tScore:-2.6,[k]:true}).res[1].ok,true);
+  assert.equal(nhiOsteo({tScore:-2.0,ra:true}).res[1].ok,false);
+});
+test('5.6.2 teriparatide 與 5.6.3 romosozumab 需 T ≤ -3.0',()=>{
+  assert.equal(nhiOsteo({tScore:-3.2,hipSpine:2,arFail12:true}).res[2].ok,true);
+  assert.equal(nhiOsteo({tScore:-2.9,hipSpine:2,arFail12:true}).res[2].ok,false);
+  assert.equal(nhiOsteo({tScore:-3.2,hipSpine:2}).res[2].ok,false);
+  assert.equal(nhiOsteo({tScore:-3.1,hipSpine:1,wristHumerus:1,recentNew:true}).res[3].ok,true);
+  assert.equal(nhiOsteo({tScore:-3.1,hipSpine:1,recentNew:true}).res[3].ok,false);
+  assert.equal(nhiOsteo({tScore:-3.1,hipSpine:1,recentNew:true,arFail:true}).res[3].ok,true);
+  assert.ok(nhiOsteo({tScore:''}).error);
 });
